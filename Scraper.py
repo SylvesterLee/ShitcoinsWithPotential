@@ -5,14 +5,20 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
+from datetime import date
+import csv
+from pandas import *
+
 
 PATH = 'C:\Program Files (x86)\chromedriver.exe'
 options = webdriver.ChromeOptions()
 options.add_experimental_option('excludeSwitches', ['enable-logging'])
+options.add_argument("--start-maximized")
 
 class Scraper(object):
 
-    def __init__(self, minHolders, maxHolders, minPercentInContractsOrDead, maxLargestHolder, maxTransfersPerMin, minTransfersPerMin, minBNBLPHoldings, hasEmptyImage):
+    def __init__(self, minHolders, maxHolders, minPercentInContractsOrDead, maxLargestHolder, maxTransfersPerMin, minTransfersPerMin, minBNBLPHoldings, hasEmptyImage, fileName):
         self.minHolders = minHolders
         self.maxHolders = maxHolders
         self.minPercentInContractsOrDead = minPercentInContractsOrDead
@@ -21,82 +27,88 @@ class Scraper(object):
         self.minTransfersPerMin = minTransfersPerMin
         self.minBNBLPHoldings = minBNBLPHoldings
         self.hasEmptyImage = hasEmptyImage
-
+        self.savedTokens = []
+        self.fileName = fileName
 
     def run(self):
-        #=========https://bscscan.com/tokentxns=========
-        #needed to properly load the html
-        tokentxns_request = urllib.request.Request('https://bscscan.com/tokentxns', headers={'User-Agent': 'Mozilla/5.0'})
-        tokentxns_html_text = urllib.request.urlopen(tokentxns_request).read()
-        tokentxns_soup = BeautifulSoup(tokentxns_html_text, 'lxml')
-        
-        #the vertical table with all of the transactions
-        transactionsTable = tokentxns_soup.find('tbody')
-
-        #list of the horizontal tables for a transaction
-        transactionTables = transactionsTable.find_all('tr') 
-
-        #the image for that transaction
-        tokenImage = transactionTables[0].find('img')['src'] #empty image: "/images/main/empty-token.png"
-        
-        #the contract address. Finds the last href in transactiontable and only saves the contract address
-        tokenContract = transactionTables[0].find_all('a', href = True)[-1]['href'][7:]
-
-        self.scrapeTokenTransfersPage(tokenContract)
-
-
-
-    def scrapeTokenTransfersPage(self, tokenContract):
-        #needed to properly load the html
-        tokenTransfers_request = urllib.request.Request(f'https://bscscan.com/token/{tokenContract}', headers={'User-Agent': 'Mozilla/5.0'})
-        print(f'https://bscscan.com/token/{tokenContract}')
-        tokenTransfers_html_text = urllib.request.urlopen(tokenTransfers_request).read()
-        tokenTransfers_soup = BeautifulSoup(tokenTransfers_html_text, 'lxml')
-
-        #the vertical table with all of the trasnfers
-        tables = tokenTransfers_soup.find_all('div', class_ = 'card-body')
-
-        overviewTable = tables[0]
-        numHolders = int(overviewTable.find('div', class_= 'mr-3').text[:-11].replace(',',""))
-
-        transfersTable = tokenTransfers_soup.find('table', class_= 'table table-md-text-normal table-hover mb-4')
-
-        print(transfersTable)
-        #list of the horizontal tables for a transfers
-        #transferTables = transfersTable.find_all('tr')
-        #print(transferTables)
-
-
-        #transferAge = transferTables[0].find('td', class_ = 'showAge')
-        #print(transferAge)
-
-    def seleniumTesting(self):
-        driver = webdriver.Chrome(PATH, options = options)
-        
-        driver.get('https://bscscan.com/tokentxns')
         try:
-            table = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.TAG_NAME,'tbody'))
-        )
-        except:
-            driver.quit()
-        tableRows = table.find_elements(By.TAG_NAME, 'tr')
-        #for tableRow in tableRows:
-        tableRow = tableRows[0]
-        tokenImg = tableRow.find_element(By.TAG_NAME,'img').get_attribute('src')  #empty image
-        tokenImgButton = tableRow.find_element(By.TAG_NAME,'img')
-        tokenImgButton.click()
+            potentialCoins = []
+            driver = webdriver.Chrome(PATH, options = options)
+            self.readSavedCoins()
 
-
-        try:
-            numHoldersString = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CLASS_NAME,'mr-3'))
-        )
-        except:
-            driver.quit()
-        numHolders = int(numHoldersString.text[:-10].replace(',',""))
-
-        print(numHolders)
-        time.sleep(4)
-        driver.quit()
+            driver.get('https://bscscan.com/tokentxns')
+            try:
+                txTable = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.TAG_NAME,'tbody'))
+            )
+            except:
+                driver.quit()
+            
+            txTableRows = txTable.find_elements(By.TAG_NAME, 'tr')
+            for i in range(14):
+                tokenImg = txTableRows[i].find_element(By.TAG_NAME,'img').get_attribute('src')
+                tokenImgBtn = txTableRows[i].find_element(By.TAG_NAME,'img')
+                tokenID = txTableRows[i].find_elements(By.TAG_NAME, 'a')[-1].get_attribute('href')[26:]
+                tokenName = txTableRows[i].find_elements(By.TAG_NAME, 'span')[-1].get_attribute('data-original-title')
+                if tokenName == None:
+                    tokenName = txTableRows[i].find_elements(By.TAG_NAME, 'a')[-1].text
         
+                if tokenID in self.savedTokens:
+                    continue
+                
+                if tokenImg == 'https://bscscan.com/images/main/empty-token.png':
+                    tokenImgBtn.click()
+                    try:
+                        numHoldersString = WebDriverWait(driver, 20).until(
+                        EC.presence_of_element_located((By.CLASS_NAME,'mr-3'))
+                    )
+                    except:
+                        driver.quit()
+                    numHolders = int(numHoldersString.text[:-10].replace(',',""))
+
+
+
+
+                    if self.minHolders < numHolders < self.maxHolders:
+                        coinDict = {
+                            "name": tokenName,
+                            "tokenID": tokenID,
+                            "holders": numHolders,
+                            "date": date.today().strftime("%Y-%m-%d"),
+                            "tokenSniffer" : f"https://tokensniffer.com/token/{tokenID}"
+                        }
+                        potentialCoins.append(coinDict)
+                    driver.back()
+
+                    try:
+                        txTable = WebDriverWait(driver, 10).until(
+                        EC.presence_of_element_located((By.TAG_NAME,'tbody'))
+                    )
+                    except:
+                        driver.quit()
+                    txTableRows = txTable.find_elements(By.TAG_NAME, 'tr')
+                    self.savedTokens.append(tokenID)
+            
+            driver.quit()
+            return potentialCoins
+        except:
+            return
+        
+    def writeToCsv(self, potentialCoins, newCSV = False):
+        try:
+            keys = potentialCoins[0].keys()
+            if newCSV:
+                with open(self.fileName, 'w', newline='')  as output_file:
+                    dict_writer = csv.DictWriter(output_file, keys)
+                    dict_writer.writeheader()
+                    dict_writer.writerows(potentialCoins)
+            else:
+                with open(self.fileName, 'a', newline='')  as output_file:
+                    dict_writer = csv.DictWriter(output_file, keys)
+                    dict_writer.writerows(potentialCoins)
+        except:
+            pass
+
+    def readSavedCoins(self):
+        file = read_csv(self.fileName)
+        self.savedTokens = file['tokenID'].tolist()
