@@ -9,6 +9,7 @@ from selenium.webdriver.common.keys import Keys
 from datetime import date
 import csv
 from pandas import *
+import os
 
 
 PATH = 'C:\Program Files (x86)\chromedriver.exe'
@@ -94,10 +95,10 @@ class Scraper(object):
         except:
             return
         
-    def writeToCsv(self, potentialCoins, newCSV = False):
+    def writeToCsv(self, potentialCoins):
         try:
             keys = potentialCoins[0].keys()
-            if newCSV:
+            if not os.path.isfile(self.fileName):
                 with open(self.fileName, 'w', newline='')  as output_file:
                     dict_writer = csv.DictWriter(output_file, keys)
                     dict_writer.writeheader()
@@ -110,5 +111,6 @@ class Scraper(object):
             pass
 
     def readSavedCoins(self):
-        file = read_csv(self.fileName)
-        self.savedTokens = file['tokenID'].tolist()
+        if os.path.isfile(self.fileName):
+            file = read_csv(self.fileName)
+            self.savedTokens = file['tokenID'].tolist()

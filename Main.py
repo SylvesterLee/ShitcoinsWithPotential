@@ -1,6 +1,6 @@
 from Scraper import Scraper
 
-iters = 75
+iters = 1
 def main():
     scraper = Scraper(200,5000,0,0,0,0,0, True, 'potentialCoins.csv')
 
