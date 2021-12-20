@@ -18,17 +18,13 @@ PATH = 'C:\Program Files (x86)\chromedriver.exe'
 options = webdriver.ChromeOptions()
 options.add_experimental_option('excludeSwitches', ['enable-logging'])
 options.add_argument("--start-maximized")
+options.add_argument('headless')
 
 class Scraper(object):
 
-    def __init__(self, minHolders, maxHolders, minPercentInContractsOrDead, maxLargestHolder, maxTransfersPerMin, minTransfersPerMin, minBNBLPHoldings, hasEmptyImage, maxBuyTax, maxSellTax, fileName):
+    def __init__(self, minHolders, maxHolders, hasEmptyImage, maxBuyTax, maxSellTax, fileName):
         self.minHolders = minHolders
         self.maxHolders = maxHolders
-        self.minPercentInContractsOrDead = minPercentInContractsOrDead
-        self.maxLargestHolder = maxLargestHolder
-        self.maxTransfersPerMin = maxTransfersPerMin
-        self.minTransfersPerMin = minTransfersPerMin
-        self.minBNBLPHoldings = minBNBLPHoldings
         self.hasEmptyImage = hasEmptyImage
         self.savedTokens = []
         self.maxBuyTax = maxBuyTax
@@ -107,6 +103,7 @@ class Scraper(object):
 
                 if conclusion == 'Yup, honeypot. Run the fuck away.':
                     driver.quit()
+                    print(f"Did not pass test: {tokenID}")
                     return False
                 elif conclusion == 'Does not seem like a honeypot.':
                     try:
