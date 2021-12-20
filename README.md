@@ -1,8 +1,9 @@
 # ShitcoinsWithPotential
-For finding shitcoins that may actually be worth something sometime
+For finding shitcoins that may actually be worth something sometime. Has filters for tax, new tokens, number of holders, and honeypot detection.
 
 
 Scraper constructor takes inputs: 
-(minHolders, maxHolders, minPercentInContractsOrDead, maxLargestHolder, maxTransfersPerMin, minTransfersPerMin, minBNBLPHoldings, hasEmptyImage, maxBuyTax, maxSellTax, fileName)
+(minHolders, maxHolders, hasEmptyImage, maxBuyTax, maxSellTax, fileName)
 
-only minHolders, maxHolders, hasEmptyImage, maxBuyTax, maxSellTax and fileName is implemented
+
+run scraper.run() as many times as you want.
